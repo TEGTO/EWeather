@@ -1,0 +1,113 @@
+﻿@model IEnumerable<WeatherForecastViewModel>
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+<style>
+     input {
+        border: 1px solid #ccc;
+        padding: 5px;
+        margin-bottom: 0.5rem;
+    }
+</style>
+
+<div class="p-3">
+    <h2>Weather Forecast</h2>
+
+    <div class="bg-light p-3 shadow-md border">
+        <input id="cityInput" class="form-control" placeholder="Enter city">
+
+        <table class="table table-striped mt-3 shadow-sm p-3 border" id="weatherTable">
+            <thead>
+                <tr>
+                    <th>City</th>
+                    <th>Date</th>
+                    <th>Precipitation</th>
+                    <th>High Temp (&deg;C)</th>
+                    <th>Low Temp (&deg;C)</th>
+                    <th>Warning</th>
+                </tr>
+            </thead>
+            <tbody id="weatherTableBody">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+    function throttle(fn, delay) {
+        let timeoutId;
+        return function (...args) {
+            if (timeoutId) return;
+            timeoutId = setTimeout(() => {
+                fn(...args);
+                timeoutId = null;
+            }, delay);
+        };
+    }
+
+    $(document).ready(function () {
+        const savedCity = localStorage.getItem('lastCity');
+        if (savedCity) {
+            $('#cityInput').val(savedCity);
+            fetchWeatherData(savedCity);
+        }
+
+        $('#cityInput').on('input', throttle(function () {
+            const city = $('#cityInput').val()?.trim();
+            if (city) {
+                localStorage.setItem('lastCity', city);
+                fetchWeatherData(city);
+            }
+        }, 1000));
+    });
+
+    function fetchWeatherData(city) {
+        $.ajax({
+            url: '@Url.Action("GetWeatherData", "Weather")',
+            type: 'GET',
+            data: { city: city },
+            success: function (data) {
+                populateWeatherTable(data);
+                checkRainWarning(city, data);
+            },
+            error: function () {
+                alert('Could not retrieve weather data. Please try again.');
+            }
+        });
+    }
+
+    function populateWeatherTable(item) {
+        const tableBody = $('#weatherTableBody');
+        tableBody.empty();
+
+        const warning = item.rainWarning ? '<span class="text-danger">Rain expected</span>' : '<span class="text-success">No warnings</span>';
+        const row = `
+                    <tr>
+                        <td>${item.city}</td>
+                        <td>${new Date(item.date).toLocaleDateString()}</td>
+                        <td>${item.precipitation} %</td>
+                        <td>${item.highTemp}</td>
+                        <td>${item.lowTemp}</td>
+                        <td>${warning}</td>
+                    </tr>
+                `;
+        tableBody.append(row);
+    }
+
+    function checkRainWarning(city, data) {
+        if (data.rainWarning) {
+            const currentDate = new Date().toLocaleDateString();
+            const storedWarningKey = `rainWarning_${city}`;
+
+            const lastWarningDate = localStorage.getItem(storedWarningKey);
+
+            if (lastWarningDate !== currentDate) {
+                alert(`Warning: Rain expected in ${city}!`);
+
+                localStorage.setItem(storedWarningKey, currentDate);
+            }
+        }
+    }
+</script>
